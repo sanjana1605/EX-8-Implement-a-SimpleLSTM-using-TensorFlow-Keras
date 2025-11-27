@@ -1,108 +1,195 @@
-# Deep-Learning-EX-8
+# EX-8-Implement-a-SimpleLSTM-using-TensorFlow-Keras.
+# AIM
 
-## Implement a Simple LSTM using TensorFlow/Keras
+To Implement-a-SimpleLSTM-using-TensorFlow-Keras
 
-## AIM:
+# NAME : Sanjana Sri N
 
-To implement a Long Short-Term Memory (LSTM) neural network using TensorFlow–Keras for sequence prediction, and to understand how LSTM handles long-term dependencies better than traditional RNN models.
+# REGISTER NUMBER : 2305003007
 
-## ALGORITHM:
+# ALGORITHM
 
-**STEP 1:** Import the required libraries such as NumPy, TensorFlow, Keras Sequential model, LSTM layer, and Dense layer.
+Step 1 — Collect and Prepare Sequential Data
 
-**STEP 2:** Create a simple numerical dataset and prepare input–output pairs. Reshape the data into 3D format (samples, timesteps, features) so it can be accepted by the LSTM layer.
+Sequential or time-series data is gathered and preprocessed. The data is scaled (e.g., between 0 and 1) because LSTMs work better with normalized values.
 
-**STEP 3:** Build the LSTM neural network using one LSTM layer followed by a Dense layer. Ensure the input shape matches the prepared training data.
+Step 2 — Convert the Data into Input Sequences
 
-**STEP 4:** Compile the model using an appropriate optimizer (Adam) and loss function (MSE). Train the model on the sequence dataset for a fixed number of epochs.
+The dataset is divided into small overlapping sequences. For example, the last N values are used to predict the next value. The data is reshaped into (samples, timesteps, features) to match LSTM input format.
 
-**STEP 5:** Use the trained model to manually validate the output by giving a test sequence and predicting the next value.
+Step 3 — Build the LSTM Model Using TensorFlow–Keras
 
-**STEP 6:** Plot additional graphs such as the training loss curve and sequence-prediction graph to visually validate the model performance.
+The model is compiled using an optimizer like Adam and a loss function like MSE.
 
-## PROGRAM:
+Step 4 — Train the LSTM Model
 
-### Name: Sanjana Sri N 
-### Register No: 2305003007
+The model is trained using the training sequences. During training, the LSTM learns long-term dependencies using its memory cell and gates. Validation data is used to monitor performance.
 
-```python
+Step 5 — Evaluate and Perform Predictions
 
-# === Simple LSTM Implementation using TensorFlow-Keras ===
+The model is tested on unseen sequences. Prediction results are compared with actual values to measure accuracy. The trained LSTM can now forecast future time steps or classify new sequences.
 
+Step 6 — Visualize and Analyze Results
+
+Graphs such as predicted vs. actual values and training loss curves are plotted. This helps understand how well the model learned the pattern and whether adjustments are needed.
+
+
+
+# PROGRAM
+``` python
 import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense
-import matplotlib.pyplot as plt
+from tensorflow.keras.callbacks import EarlyStopping
 
-# --- Step 1: Prepare a simple sequence dataset ---
-sequence = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9])
+def generate_sine_wave(n_points=2000, freq=0.01, noise=0.0):
+    x = np.arange(n_points)
+    y = np.sin(2 * np.pi * freq * x) + (np.random.normal(scale=noise, size=n_points) if noise > 0 else 0)
+    return y
 
-X = []
-y = []
-for i in range(len(sequence) - 3):
-    X.append(sequence[i:i+3])
-    y.append(sequence[i+3])
+series = generate_sine_wave(n_points=2000, freq=0.005, noise=0.02)
 
-X = np.array(X)
-y = np.array(y)
+def create_sequences(data, window_size):
+    """
+    Convert the 1D data array into (X, y) sequences for supervised learning.
+    X shape: (samples, window_size, 1)
+    y shape: (samples,)
+    """
+    X, y = [], []
+    for i in range(len(data) - window_size):
+        X.append(data[i:i + window_size])
+        y.append(data[i + window_size])
+    X = np.array(X)
+    y = np.array(y)
+    # add feature dimension
+    X = X[..., np.newaxis]
+    return X, y
 
-X = X.reshape((X.shape[0], X.shape[1], 1))
+WINDOW_SIZE = 50
+X, y = create_sequences(series, WINDOW_SIZE)
 
-# --- Step 2: Build LSTM model ---
-model = Sequential([
-    LSTM(64, activation='tanh', input_shape=(3, 1)),
-    Dense(1)
-])
+# split into train / val / test
+X_train_full, X_test, y_train_full, y_test = train_test_split(X, y, test_size=0.15, shuffle=False)
+X_train, X_val, y_train, y_val = train_test_split(X_train_full, y_train_full, test_size=0.15, shuffle=False)
 
-# --- Step 3: Compile model ---
-model.compile(optimizer='adam', loss='mse')
+print("Shapes:")
+print("  X_train:", X_train.shape, "y_train:", y_train.shape)
+print("  X_val:  ", X_val.shape, "y_val:  ", y_val.shape)
+print("  X_test: ", X_test.shape, "y_test: ", y_test.shape)
 
-# --- Step 4: Train the model ---
-history = model.fit(X, y, epochs=200, verbose=0)
+def build_model(window_size, n_units=64):
+    model = Sequential([
+        LSTM(n_units, input_shape=(window_size, 1)),
+        Dense(1)  # predict next scalar value
+    ])
+    model.compile(optimizer='adam', loss='mse', metrics=['mae'])
+    return model
 
-# --- Step 5: Test prediction ---
-test_input = np.array([7, 8, 9]).reshape((1, 3, 1))
-prediction = model.predict(test_input)
+model = build_model(WINDOW_SIZE, n_units=64)
+model.summary()
 
-print("Input Sequence: [7, 8, 9]")
-print("Predicted next number:", prediction[0][0])
+# -----------------------------
+early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
 
+history = model.fit(
+    X_train, y_train,
+    validation_data=(X_val, y_val),
+    epochs=100,
+    batch_size=32,
+    callbacks=[early_stopping],
+    verbose=2
+)
 
-# --- GRAPH 1: Training Loss Curve ---
-plt.plot(history.history['loss'])
-plt.title("Training Loss Curve")
-plt.xlabel("Epoch")
-plt.ylabel("Loss")
-plt.grid(True)
-plt.show()
+eval_result = model.evaluate(X_test, y_test, verbose=0)
+print(f"\nTest loss (MSE): {eval_result[0]:.6f}, Test MAE: {eval_result[1]:.6f}")
 
-# --- GRAPH 2: Sequence and Prediction ---
-plt.plot(sequence, marker='o', label="Original Sequence")
-plt.scatter(len(sequence), prediction[0][0], color='red', label="Predicted Value", s=80)
-plt.title("Sequence and Predicted Next Number")
-plt.xlabel("Index")
-plt.ylabel("Value")
+# Predict next values for the test set (one-step prediction)
+y_pred = model.predict(X_test)
+
+def plot_predictions(y_true, y_pred, n_points=200):
+    """
+    Plot a slice of true vs predicted values.
+    """
+    plt.figure(figsize=(12,5))
+    idx = np.arange(len(y_true))
+    plt.plot(idx[:n_points], y_true[:n_points], label='True', linewidth=1.5)
+    plt.plot(idx[:n_points], y_pred[:n_points], label='Predicted', linewidth=1.2)
+    plt.title("True vs Predicted (first {} points of test set)".format(n_points))
+    plt.xlabel("Time step (test index)")
+    plt.ylabel("Series value")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+plot_predictions(y_test, y_pred, n_points=300)
+
+def rolling_forecast(model, seed_sequence, n_steps):
+    """
+    Given a seed_sequence of length WINDOW_SIZE, predict n_steps into the future
+    by repeatedly appending predictions and using the last WINDOW_SIZE values as input.
+    """
+    seq = seed_sequence.copy().tolist()
+    preds = []
+    for _ in range(n_steps):
+        x_in = np.array(seq[-WINDOW_SIZE:])[np.newaxis, ..., np.newaxis]  # shape (1, WINDOW_SIZE, 1)
+        next_val = model.predict(x_in)[0,0]
+        preds.append(next_val)
+        seq.append(next_val)
+    return np.array(preds)
+
+seed = X_test[0].squeeze()  # first test window as seed
+future_preds = rolling_forecast(model, seed, n_steps=200)
+
+# plot seed + future predictions
+plt.figure(figsize=(12,4))
+plt.plot(np.arange(WINDOW_SIZE), seed, label='Seed (last observed window)')
+plt.plot(np.arange(WINDOW_SIZE, WINDOW_SIZE + len(future_preds)), future_preds, label='Rolling forecast')
+plt.axvline(WINDOW_SIZE-0.5, color='k', linestyle='--', linewidth=0.8)
+plt.title("Rolling multi-step forecast")
+plt.xlabel("Time step (relative)")
 plt.legend()
 plt.grid(True)
+plt.tight_layout()
 plt.show()
-
 ```
 
-## OUTPUT:
 
-### Predicted Value: 
-
-<img width="691" height="82" alt="image" src="https://github.com/user-attachments/assets/29b1462f-daa8-4f97-9715-659008e000a7" />
-
-### Training Loss Curve:
-
-<img width="576" height="455" alt="image" src="https://github.com/user-attachments/assets/5103a510-b72a-4aa1-b0c8-e50d161e7108" />
-
-### Sequence and Prediction:
-
-<img width="554" height="455" alt="image" src="https://github.com/user-attachments/assets/fda964f2-4e31-46a0-8084-d5157f6ba05b" />
+# OUTPUT
 
 
-## RESULT:
-Thus, the program to implement a Simple LSTM neural network for sequence prediction has been successfully developed and executed.
+
+
+Epoch
+
+
+<img width="1250" height="457" alt="image" src="https://github.com/user-attachments/assets/49db8841-7b65-41b9-bfe9-dd7e99d2d229" />
+
+
+
+Test Loss(MSE)
+
+<img width="797" height="111" alt="image" src="https://github.com/user-attachments/assets/578669a0-5e10-4ace-8068-e552f53cb545" />
+
+
+Plot Predictions
+
+
+<img width="1197" height="560" alt="image" src="https://github.com/user-attachments/assets/3413b50e-545c-4d95-aee5-1ee58cfaf962" />
+
+
+
+
+
+Rolling_forecast
+
+
+<img width="1102" height="368" alt="image" src="https://github.com/user-attachments/assets/1ad95b06-8f5c-4a59-acf3-71c24ac41d85" />
+
+
+# RESULT
+
+Thus, the Implement-a-SimpleLSTM-using-TensorFlow-Keras is successfully executed.
